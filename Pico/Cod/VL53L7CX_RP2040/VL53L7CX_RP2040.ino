@@ -79,12 +79,9 @@ void loop() {
     statusDR = vl53l7cx_dr.vl53l7cx_get_ranging_data(&ResultsDR);
     print_result(&ResultsDR);
   }
-
-
   if (Serial.available() > 0) {
     handle_cmd(Serial.read());
   }
-  delay(1000);
 }
 
 void print_result(VL53L7CX_ResultsData *Result) {
@@ -94,7 +91,7 @@ void print_result(VL53L7CX_ResultsData *Result) {
 
   zones_per_line = (number_of_zones == 16) ? 4 : 8;
 
-  display_commands_banner();
+  //display_commands_banner();
 
   SerialPort.print("Cell Format :\n\n");
 
