@@ -61,7 +61,7 @@ The geometry had to be modified:
 ### Power management
 The robot  powered by a 2S 2200 mAh **LiPo**. The battery output is regulated by a DC-DC converter, which supplies a stable 5V voltage to the Raspberry Pi SBPC.
 The same battery also powers a DC motor driver that controls a single drive motor. This driver receives control signals directly from the Raspberry Pi, enabling the robot to move forward and backward. In addition, the Raspberry Pi controls a servo motor responsible for steering, allowing the robot to navigate its environment
-<img src = "WhatsApp Image 2025-06-11 at 11.00.27_853c1f56.jpg" width = "300" height = "600" style="transform: rotate(270deg);" >
+<img src = "Poze/bat.jpg" width = "300" height = "600" style="transform: rotate(270deg);" >
 
 
 ### Sensor management
