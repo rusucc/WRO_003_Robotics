@@ -62,7 +62,16 @@ The geometry had to be modified:
 The robot  powered by a 2S 2200 mAh **LiPo**. The battery output is regulated by a DC-DC converter, which supplies a stable 5V voltage to the Raspberry Pi SBPC.
 The same battery also powers a DC motor driver that controls a single drive motor. This driver receives control signals directly from the Raspberry Pi, enabling the robot to move forward and backward. In addition, the Raspberry Pi controls a servo motor responsible for steering, allowing the robot to navigate its environment
 <img src = "Poze/baterry.jpg" width = "300" height = "600" style="transform: rotate(270deg);" >
-
+<img src = "Poze/pi_pico.jpg" width = "300" height = "600" style="transform: rotate(270deg);" >
+<img src = "Poze/top_plate.jpg" width = "300" height = "600" style="transform: rotate(270deg);" >
+<img src = "Poze/bottom_plate.jpg" width = "300" height = "600" style="transform: rotate(270deg);" >
+<img src = "Poze/etching.jpeg" width = "300" height = "600" style="transform: rotate(270deg);" >
+<img src = "Poze/drill.jpeg" width = "300" height = "600" style="transform: rotate(270deg);" >
+<img src = "Poze/raspberry_pi_top.jpg" width = "300" height = "600" style="transform: rotate(270deg);" >
+<img src = "Poze/raspberry_pi.jpg" width = "300" height = "600" style="transform: rotate(270deg);" >
+<img src = "Poze/resist.jpeg" width = "300" height = "600" style="transform: rotate(270deg);" >
+<img src = "Poze/RPIPCB.jpeg" width = "300" height = "600" style="transform: rotate(270deg);" >
+<img src = "Poze/solder.jpeg" width = "300" height = "600" style="transform: rotate(270deg);" >
 
 ### Sensor management
 
