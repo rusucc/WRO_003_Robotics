@@ -103,7 +103,274 @@ The same battery also powers a DC motor driver that controls a single drive moto
 	- It allows for future development of advanced positioning algorithms
 #
 ## Software
-### Mobility management
-### Obstacle management
-## Current issues
-## Future improvements
+Pentru ca o mașină să se poată conduce singură, trebuie luate în considerare două aspecte esențiale: **hardware-ul** și **software-ul**. Partea de hardware este dezvoltată de colegii mei, iar de partea de software mă ocup eu.
+
+Algoritmul este cel care "inteligentizează" fiecare dispozitiv. Să descriem codul în detaliu:
+
+1.  **Alegerea limbajului de programare (Python)**: Am optat pentru **Python** datorită ușurinței sale de înțelegere, logicii simple și comunității extinse, care facilitează colaborarea în echipă și crește nivelul de abstractizare, chiar dacă personal aș fi preferat C/C++.
+2.  **Alegerea bibliotecii de procesare a imaginilor (OpenCV)**: Pentru procesarea vizuală, vom folosi **OpenCV**. Aceasta este o bibliotecă recunoscută, cu o comunitate vastă, fiind, de asemenea, *cross-platform* (compatibilă cu multiple limbaje de programare precum C++, Python, Java etc.).
+
+Algoritmul pe care îl vom crea este unul simplu, care preia informații de la cameră - s - a folosit camera wide Picamera. Exista suport pentru utilizarea acesteia cu Raspberry Pi. (am folosit Pi4B, 4 GB)
+---
+
+### Mobility Management
+### Obstacle Management
+
+Vom începe cu explicarea algoritmului pentru cameră:
+
+Primul pas este **importarea bibliotecilor** necesare. O bibliotecă este o colecție de cod pre-scris care oferă funcționalități specifice, accelerând procesul de dezvoltare și simplificând complexitatea anumitor operațiuni.
+
+```python
+import cv2
+import numpy as np
+from picamera2 import Picamera2
+```
+
+**Descrierea bibliotecilor:**
+
+* **`cv2` (OpenCV)**: Utilizată pentru procesarea imaginilor și viziune computerizată.
+* **`numpy` (Numerical Python)**: O bibliotecă fundamentală pentru calcule științifice și operații cu array-uri multidimensionale.
+* **`Picamera2`**: O versiune nouă a bibliotecii pentru controlul camerelor video de la Raspberry Pi.
+
+```python
+hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+```
+
+**Transformarea imaginii în spațiul de culoare HSV:** Această linie de cod convertește imaginea primită (presupusă a fi în format BGR - Blue, Green, Red) în spațiul de culoare HSV (Hue, Saturation, Value). Conversia în HSV este adesea preferată pentru detecția culorilor, deoarece separă informația de luminozitate (Value) de cea de culoare (Hue și Saturation), făcând detecția mai robustă la variațiile de iluminare.
+
+```python
+lowerRed1 = np.array([0, 120, 70])
+upperRed1 = np.array([10, 255, 255])
+lowerRed2 = np.array([170, 120, 70])
+upperRed2 = np.array([180, 255, 255])
+```
+
+**Definirea intervalelor de culoare pentru roșu:** Am definit două intervale de culori pentru roșu (deoarece roșul se află la ambele capete ale spectrului de culori în spațiul HSV). Aceste intervale vor fi utilizate pentru a crea o mască, izolând pixelii care corespund acestor culori.
+
+```python
+maskRed1 = cv2.inRange(hsv, lowerRed1, upperRed1)
+maskRed2 = cv2.inRange(hsv, lowerRed2, upperRed2)
+redMask = cv2.bitwise_or(maskRed1, maskRed2)
+```
+
+**Crearea măștii pentru culoarea roșie:** Aceste linii aplică un filtru pe imaginea HSV și returnează o mască binară (`redMask`). Pixelii din mască vor fi albi (255) acolo unde culoarea se încadrează în intervalele de roșu definite, și negri (0) în caz contrar. Prin combinarea (`bitwise_or`) celor două măști se obține masca finală pentru roșu.
+
+```python
+lowerGreen = np.array([35, 50, 50])
+upperGreen = np.array([85, 255, 255])
+greenMask = cv2.inRange(hsv, lowerGreen, upperGreen)
+```
+
+**Crearea măștii pentru culoarea verde:** Similar cu roșu, definim un interval de culoare pentru verde și creăm masca corespunzătoare (`greenMask`).
+
+```python
+kernel = np.ones((4,4), np.uint8)
+redMask = cv2.erode(redMask, kernel, iterations=3)
+greenMask = cv2.erode(greenMask, kernel, iterations=3)
+```
+
+**Erodarea măștilor:** Aplicăm o operație de **eroziune** măștilor roșie și verde. Aceasta ajută la eliminarea zgomotului, a pixelilor izolați și la separarea obiectelor care ar putea fi conectate. Parametrul `kernel` definește forma și dimensiunea elementului de structurare, iar `iterations` controlează de câte ori se aplică operația.
+
+```python
+redContours, _ = cv2.findContours(redMask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+largestRed = None
+maxRedArea = 0
+
+for cnt in redContours:
+    area = cv2.contourArea(cnt)
+    if area > maxRedArea and area > 100:
+        maxRedArea = area
+        largestRed = cnt
+```
+
+**Detectarea contururilor roșii și găsirea celui mai mare obiect roșu:** Aici se detectează contururile (adică granițele) obiectelor din masca roșie. Apoi, se iterează prin aceste contururi pentru a identifica pe cel cu cea mai mare arie (suprafață), reprezentând cel mai mare obiect roșu detectat. Pragul de `100` pixeli este folosit pentru a filtra contururile mici, considerate zgomot.
+
+```python
+greenContours, _ = cv2.findContours(greenMask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+largestGreen = None
+maxGreenArea = 0
+for cnt in greenContours:
+    area = cv2.contourArea(cnt)
+    if area > maxGreenArea and area > 100:
+        maxGreenArea = area
+        largestGreen = cnt
+```
+
+**Detectarea contururilor verzi și găsirea celui mai mare obiect verde:** Similar cu roșu, se detectează contururile obiectelor din masca verde și se identifică cel mai mare obiect verde.
+
+```python
+largestObject = None
+objectColor = None
+if largestRed is not None and largestGreen is not None:
+    if maxRedArea > maxGreenArea:
+        largestObject = largestRed
+        objectColor = "red"
+    else:
+        largestObject = largestGreen
+        objectColor = "green"
+elif largestRed is not None:
+    largestObject = largestRed
+    objectColor = "red"
+elif largestGreen is not None:
+    largestObject = largestGreen
+    objectColor = "green"
+```
+
+**Determinarea celui mai mare obiect detectat:** Această secțiune compară ariile celui mai mare obiect roșu și celui mai mare obiect verde. Dacă ambele culori sunt prezente, se alege obiectul cu aria cea mai mare. Dacă doar una dintre culori este prezentă, se alege obiectul corespunzător. Variabilele `largestObject` și `objectColor` vor stoca informațiile despre obiectul dominant.
+
+```python
+redPixels = cv2.countNonZero(redMask)
+greenPixels = cv2.countNonZero(greenMask)
+totalPixels = frame.shape[0] * frame.shape[1]
+```
+
+**Calculul numărului de pixeli pentru fiecare culoare:** Aici se numără pixelii non-zero (adică pixelii albi, care reprezintă culoarea detectată) din fiecare mască. De asemenea, se calculează numărul total de pixeli din imagine.
+
+```python
+redPercentage = (redPixels / totalPixels) * 100
+greenPercentage = (greenPixels / totalPixels) * 100
+```
+
+**Calculul procentajului de pixeli:** Se calculează procentajul de pixeli roșii și verzi din întreaga imagine, oferind o măsură a prevalenței fiecărei culori.
+
+```python
+return redMask, greenMask, redPercentage, greenPercentage, largestObject, objectColor
+```
+
+**Returnarea valorilor:** Funcția `detectColors` returnează măștile pentru roșu și verde, procentajele acestora, cel mai mare obiect detectat (dacă există) și culoarea acestuia.
+
+```python
+def main():
+```
+
+**Funcția principală `main`:** Aceasta este funcția de intrare a programului, unde se inițiază și se controlează fluxul principal de execuție.
+
+```python
+picam2 = Picamera2()
+```
+
+**Inițializarea camerei:** Se creează o instanță a clasei `Picamera2` pentru a interacționa cu camera Raspberry Pi.
+
+```python
+config = picam2.create_preview_configuration(main={"size": (640, 480)})
+picam2.configure(config)
+```
+
+**Configurarea camerei:** Se configurează camera pentru a capta imagini la o rezoluție de `640x480` pixeli, adecvată pentru previzualizare.
+
+```python
+picam2.start()
+```
+
+**Pornirea stream-ului camerei:** Se pornește captarea video de la cameră.
+
+```python
+try:
+```
+
+**Bloc `try`:** Acest bloc gestionează excepțiile care ar putea apărea în timpul execuției programului, asigurând o închidere curată a resurselor.
+
+```python
+while True:
+```
+
+**Bucla principală de procesare:** Această buclă rulează continuu, procesând fiecare cadru capturat de cameră.
+
+```python
+frame = picam2.capture_array()
+frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+displayFrame = frame.copy()
+```
+
+**Capturarea și pregătirea imaginii:** Se captează un cadru de la cameră, se convertește din formatul RGB (specific `Picamera2`) în BGR (specific OpenCV) și se creează o copie a cadrului pentru a fi afișată, fără a modifica imaginea originală.
+
+```python
+redMask, greenMask, redPerc, greenPerc, largestObj, objColor = detectColors(frame)
+```
+
+**Apelarea funcției de detecție a culorilor:** Se apelează funcția `detectColors` cu cadrul curent pentru a obține măștile, procentajele și informațiile despre cel mai mare obiect detectat.
+
+```python
+if largestObj is not None:
+    x,y,w,h = cv2.boundingRect(largestObj)
+    if objColor == "red":
+        color = (0, 0, 255)  # Red
+        label = f"Largest Red: {cv2.contourArea(largestObj):.0f}px"
+    else:
+        color = (0, 255, 0)  # Green
+        label = f"Largest Green: {cv2.contourArea(largestObj):.0f}px"
+```
+
+**Desenarea dreptunghiului de încadrare și a etichetei:** Dacă a fost detectat un obiect dominant (`largestObj` nu este `None`), se calculează coordonatele dreptunghiului de încadrare al acestuia. Apoi, se definesc culoarea și eticheta care vor fi folosite pentru a desena dreptunghiul și textul pe imaginea de afișat, indicând culoarea și aria obiectului.
+
+```python
+cv2.rectangle(displayFrame, (x,y), (x+w,y+h), color, 3)
+cv2.putText(displayFrame, label, (x,y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+```
+
+**Afișarea vizualizărilor:** Se desenează dreptunghiul de încadrare și textul etichetei pe imaginea destinată afișării.
+
+```python
+redDisplay = cv2.cvtColor(redMask, cv2.COLOR_GRAY2BGR)
+greenDisplay = cv2.cvtColor(greenMask, cv2.COLOR_GRAY2BGR)
+```
+
+**Pregătirea măștilor pentru afișare:** Măștile binare (care sunt imagini pe un singur canal, gri) sunt convertite în imagini BGR cu 3 canale, pentru a putea fi afișate alături de cadrul original.
+
+```python
+topRow = np.hstack((displayFrame, redDisplay))
+bottomRow = np.hstack((greenDisplay, np.zeros_like(frame)))
+combined = np.vstack((topRow, bottomRow))
+```
+
+**Combinarea imaginilor pentru afișare:** Imaginile sunt combinate orizontal (`hstack`) și vertical (`vstack`) pentru a crea o singură fereastră de afișare care să conțină cadrul original cu detecția obiectului, masca roșie și masca verde. `np.zeros_like(frame)` creează o imagine neagră de aceeași dimensiune cu cadrul original, folosită pentru a umple spațiul rămas liber.
+
+```python
+cv2.putText(combined, "Original (Largest Object)", (10, 30),
+    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255,255,255), 2)
+cv2.putText(combined, "Red Mask", (650, 30),
+    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
+cv2.putText(combined, "Green Mask", (10, 510),
+    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2)
+```
+
+**Adăugarea etichetelor text pe imaginile combinate:** Se adaugă etichete text pe imaginea combinată pentru a identifica fiecare secțiune (cadru original, mască roșie, mască verde).
+
+```python
+cv2.imshow("Largest Object Detection", combined)
+```
+
+**Afișarea ferestrei:** Se afișează fereastra cu imaginile combinate.
+
+```python
+if objColor == "red" and redPerc > 5:
+    print("Right")
+elif objColor == "green" and greenPerc > 5:
+    print("Left")
+else:
+    print("Just GO")
+```
+
+**Logica de decizie a mișcării:** Această secțiune implementează o logică simplă de decizie bazată pe culoarea obiectului dominant și procentajul de pixeli. Dacă un obiect roșu dominant depășește un anumit prag, se sugerează o mișcare "Right" (dreapta); dacă un obiect verde dominant depășește pragul, se sugerează "Left" (stânga). În caz contrar, mașina ar trebui să "Just GO" (să meargă înainte).
+
+```python
+if cv2.waitKey(1) & 0xFF == ord('q'):
+    break
+```
+
+**Controlul buclei și închiderea:** Se așteaptă o tastă timp de 1 milisecundă. Dacă tasta apăsată este 'q', bucla se întrerupe, încheind programul.
+
+```python
+finally:
+    picam2.stop()
+    cv2.destroyAllWindows()
+```
+
+**Bloc `finally`:** Acest bloc se execută întotdeauna, indiferent dacă a apărut o excepție sau nu. Este folosit pentru a opri stream-ul camerei și a închide toate ferestrele OpenCV, asigurând eliberarea resurselor.
+
+```python
+if __name__ == "__main__":
+    main()
+```
+
+**Punctul de intrare al programului:** Această construcție standard Python asigură că funcția `main()` este apelată doar atunci când scriptul este executat direct (nu când este importat ca modul).
